@@ -38,7 +38,9 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
   count + distinct localities + regions, cached hourly with a safe fallback so
   the build never breaks if the DB is unreachable) and a far richer product mock
   — a realistic app screen (search bar, streets/park mini-map, clustered pins, a
-  live-location ping, the featured card, and a peeking second result).
+  live-location ping, the featured card, and a peeking second result). The whole
+  mock is now a link into `/app` (hover lift + focus ring) so a tap on it — or its
+  "Get directions" bar — enters the real experience instead of dead-ending.
 - **Mobile-first inputs:** `.field` is 16px on mobile (`text-base sm:text-sm`) to
   stop iOS Safari from auto-zooming the viewport on focus; applied to every
   search box incl. the compact location search. Hero stats stay legible on small
