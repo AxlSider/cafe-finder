@@ -1,0 +1,12 @@
+node_modules
+.next
+.git
+.env
+.env*.local
+npm-debug.log*
+*.md
+docs
+public/uploads/*
+!public/uploads/.gitignore
+coverage
+.vscode

@@ -1,0 +1,256 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ==================================================================
+   CupScout design tokens (RGB channel triplets → Tailwind rgb(var())).
+   Light is the default; dark applies via prefers-color-scheme OR an
+   explicit [data-theme] set by the theme toggle.
+   ================================================================== */
+:root {
+  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI",
+    Roboto, sans-serif;
+  --font-display: "Sora", var(--font-sans);
+
+  --ease-spring: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-emphasized: cubic-bezier(0.2, 0, 0, 1);
+
+  /* Brand — warm amber / caramel roast */
+  --brand-50: 251 243 236;
+  --brand-100: 246 226 210;
+  --brand-200: 237 195 163;
+  --brand-300: 225 158 107;
+  --brand-400: 217 122 56;
+  --brand-500: 194 94 30;
+  --brand-600: 165 74 22;
+  --brand-700: 133 59 20;
+  --brand-800: 107 49 19;
+  --brand-900: 82 38 18;
+
+  /* Accent — fresh teal */
+  --accent-400: 45 178 156;
+  --accent-500: 15 138 118;
+  --accent-600: 12 114 99;
+  --accent-700: 12 90 80;
+
+  /* Neutrals — cool-warm, not beige */
+  --surface: 255 255 255;
+  --surface-muted: 249 248 246;
+  --surface-sunken: 241 239 235;
+  --surface-raised: 255 255 255;
+  --line: 228 225 219;
+
+  --ink: 28 25 23;
+  --ink-soft: 68 64 60;
+  --ink-muted: 120 113 108;
+  --ink-faint: 168 162 155;
+
+  --success: 15 138 118;
+  --warning: 180 121 31;
+  --danger: 180 35 24;
+
+  --shadow: 28 25 23;
+}
+
+:root:not([data-theme="light"]) {
+  @media (prefers-color-scheme: dark) {
+    --surface: 31 27 23;
+    --surface-muted: 22 19 16;
+    --surface-sunken: 38 33 27;
+    --surface-raised: 40 35 29;
+    --line: 51 44 37;
+
+    --ink: 245 242 236;
+    --ink-soft: 200 193 184;
+    --ink-muted: 150 142 133;
+    --ink-faint: 110 103 95;
+
+    --brand-400: 224 133 70;
+    --brand-500: 210 108 45;
+    --brand-600: 200 99 40;
+
+    --success: 45 178 156;
+    --warning: 214 158 74;
+    --danger: 232 108 96;
+
+    --shadow: 0 0 0;
+  }
+}
+
+:root[data-theme="dark"] {
+  --surface: 31 27 23;
+  --surface-muted: 22 19 16;
+  --surface-sunken: 38 33 27;
+  --surface-raised: 40 35 29;
+  --line: 51 44 37;
+
+  --ink: 245 242 236;
+  --ink-soft: 200 193 184;
+  --ink-muted: 150 142 133;
+  --ink-faint: 110 103 95;
+
+  --brand-400: 224 133 70;
+  --brand-500: 210 108 45;
+  --brand-600: 200 99 40;
+
+  --success: 45 178 156;
+  --warning: 214 158 74;
+  --danger: 232 108 96;
+
+  --shadow: 0 0 0;
+}
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+  body {
+    @apply bg-surface-muted text-ink antialiased;
+    font-feature-settings: "cv11", "ss01";
+  }
+  ::selection {
+    background: rgb(var(--brand-400) / 0.25);
+  }
+  :where(a, button, input, select, textarea, [tabindex]):focus-visible {
+    @apply outline-none;
+    box-shadow: var(--tw-shadow, 0 0 #0000), 0 0 0 3px rgb(var(--brand-400) / 0.4);
+    border-radius: 0.5rem;
+  }
+  h1, h2, h3 {
+    @apply font-display tracking-tight;
+  }
+}
+
+@layer components {
+  /* Buttons */
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-full px-4 py-2.5
+      text-sm font-semibold transition-all duration-200 ease-spring
+      disabled:cursor-not-allowed disabled:opacity-50 active:scale-[0.97];
+    min-height: 44px;
+  }
+  .btn-primary {
+    @apply btn bg-brand-600 text-white hover:bg-brand-700 shadow-sm;
+  }
+  .btn-secondary {
+    @apply btn border border-line bg-surface text-ink hover:border-ink-faint hover:bg-surface-sunken;
+  }
+  .btn-ghost {
+    @apply btn text-ink-soft hover:bg-surface-sunken;
+  }
+  .btn-accent {
+    @apply btn bg-accent-600 text-white hover:bg-accent-700;
+  }
+
+  /* Surfaces */
+  .card {
+    @apply rounded-card border border-line bg-surface shadow-card;
+  }
+  .panel {
+    @apply rounded-xl2 bg-surface;
+  }
+
+  /* Chips / pills */
+  .chip {
+    @apply inline-flex items-center gap-1.5 rounded-full border border-line
+      bg-surface px-3 py-1.5 text-xs font-medium text-ink-soft
+      transition-colors duration-150;
+  }
+  .chip-active {
+    @apply border-brand-500 bg-brand-500 text-white;
+  }
+  .chip-static {
+    @apply inline-flex items-center gap-1 rounded-full bg-surface-sunken px-2.5 py-1
+      text-xs font-medium text-ink-soft;
+  }
+
+  /* Inputs */
+  /* NOTE: base font is 16px (text-base) on mobile to stop iOS Safari from
+     auto-zooming the viewport when a field gains focus; tightens to 14px from
+     the sm breakpoint up where that zoom behavior doesn't apply. */
+  .field {
+    @apply w-full rounded-xl border border-line bg-surface px-4 py-3 text-base
+      text-ink placeholder:text-ink-faint transition-shadow
+      focus:border-brand-400 sm:text-sm;
+    min-height: 46px;
+  }
+
+  /* Reason pill for explainable recommendations */
+  .reason {
+    @apply inline-flex items-center gap-1.5 rounded-full bg-accent-500/10 px-2.5 py-1
+      text-xs font-medium text-accent-700;
+  }
+
+  /* Section eyebrow label */
+  .eyebrow {
+    @apply text-xs font-semibold uppercase tracking-[0.14em] text-ink-muted;
+  }
+
+  /* Skeleton shimmer */
+  .skeleton {
+    @apply relative overflow-hidden bg-surface-sunken;
+  }
+  .skeleton::after {
+    content: "";
+    @apply absolute inset-0 -translate-x-full;
+    background: linear-gradient(
+      90deg,
+      transparent,
+      rgb(var(--surface) / 0.6),
+      transparent
+    );
+    animation: shimmer 1.4s infinite;
+  }
+}
+
+/* Reveal-on-scroll (JS adds .is-visible) */
+.reveal {
+  opacity: 0;
+  transform: translateY(14px);
+  transition:
+    opacity 0.55s var(--ease-spring),
+    transform 0.55s var(--ease-spring);
+  will-change: transform, opacity;
+}
+.reveal.is-visible {
+  opacity: 1;
+  transform: none;
+}
+
+/* Horizontal scroll rails hide scrollbars but stay accessible */
+.no-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* Leaflet tuned to the system */
+.leaflet-container {
+  font-family: var(--font-sans);
+  background: rgb(var(--surface-sunken));
+}
+.leaflet-bar a {
+  background: rgb(var(--surface));
+  color: rgb(var(--ink));
+  border-color: rgb(var(--line));
+}
+.leaflet-bar a:hover {
+  background: rgb(var(--surface-sunken));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  .reveal {
+    opacity: 1;
+    transform: none;
+  }
+}

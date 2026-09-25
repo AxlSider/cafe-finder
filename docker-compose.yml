@@ -1,0 +1,49 @@
+# One-command CupScout deployment: MySQL + the app.
+#   docker compose up -d --build
+#   docker compose run --rm app npm run db:seed   # create the admin (once)
+#
+# Change the passwords and ADMIN_* before exposing this publicly.
+
+services:
+  db:
+    image: mysql:8.0
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: change-me-root
+      MYSQL_DATABASE: cafe_finder
+      MYSQL_USER: cupscout
+      MYSQL_PASSWORD: change-me-app
+    volumes:
+      - db-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-p$$MYSQL_ROOT_PASSWORD"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  app:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: "mysql://cupscout:change-me-app@db:3306/cafe_finder"
+      NEXT_PUBLIC_APP_URL: "http://localhost:3000"
+      NEXT_PUBLIC_MAP_TILE_URL: "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+      NEXT_PUBLIC_MAP_ATTRIBUTION: "© OpenStreetMap contributors"
+      GEOCODER_PROVIDER: "nominatim"
+      GEOCODER_BASE_URL: "https://nominatim.openstreetmap.org"
+      GEOCODER_USER_AGENT: "CupScout (+https://your-domain.example)"
+      PLACES_PROVIDER: "curated"
+      ADMIN_EMAIL: "admin@cupscout.app"
+      ADMIN_PASSWORD: "change-me-admin"
+      # GOOGLE_MAPS_API_KEY: ""   # optional: enables rating/photo enrichment
+    ports:
+      - "3000:3000"
+    volumes:
+      - uploads:/app/public/uploads
+
+volumes:
+  db-data:
+  uploads:

@@ -1,0 +1,384 @@
+// Cafe Finder database schema.
+// Engine: MySQL / MariaDB (XAMPP). Full docs: docs/DATABASE.md
+//
+// Data ownership is explicit (see the `source` fields / enums):
+//   CURATED  = Cafe Finder curated dataset (we own/maintain it)
+//   EXTERNAL = imported from an external provider (attribution required)
+//   USER     = user-generated (favorites, reports, preferences)
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+// ------------------------------------------------------------------
+// Geographic coverage — enforced at the data layer, not just the UI.
+// ------------------------------------------------------------------
+enum Region {
+  LUZON
+  SWITZERLAND
+}
+
+enum DataSource {
+  CURATED
+  EXTERNAL
+  USER
+}
+
+enum PriceLevel {
+  BUDGET // $
+  MODERATE // $$
+  EXPENSIVE // $$$
+}
+
+// ------------------------------------------------------------------
+// Cafes (core entity)
+// ------------------------------------------------------------------
+model Cafe {
+  id          String     @id @default(cuid())
+  slug        String     @unique
+  name        String
+  region      Region
+  // Human-readable locality shown as "📍 Baguio City" etc.
+  locality    String
+  address     String?    @db.Text
+  latitude    Float
+  longitude   Float
+  // Nullable on purpose: we never fabricate. Null => "unavailable" in UI.
+  rating      Float? // external/aggregate rating, 0..5
+  reviewCount Int?
+  priceLevel  PriceLevel?
+  phone       String?
+  website     String?
+  photoUrl    String?    @db.Text
+  photoAlt    String?
+  description String?    @db.Text
+
+  source         DataSource @default(CURATED)
+  sourceName     String? // e.g. "OpenStreetMap", "Google" — attribution
+  sourceRef      String? // external id for de-duplication / refresh
+  ratingSource   String? // where a rating came from, if any (e.g. "Google")
+  photoAttribution String? @db.Text // credit for the photo, when required
+  // External place identity for future rating/photo enrichment (see
+  // docs/DATA-SOURCES.md). Kept nullable; enrichment is opt-in per provider key.
+  googlePlaceId  String? // Google Places place_id, when matched
+  googlePhotoName String? @db.Text // Google Places photo resource name (proxied, not cached)
+  externalPlaceId String? // generic external provider id (Foursquare, etc.)
+  lastSyncedAt   DateTime? // when external data was last refreshed
+  // Community (user-generated) aggregate rating — denormalized for fast lists.
+  // Distinct from `rating` (external/curated); shown as "CupScout community".
+  communityRating      Float? // average of user ratings (1..5)
+  communityRatingCount Int    @default(0)
+  featured       Boolean    @default(false)
+  featuredRank   Int? // admin-curated ordering when featured
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  hours     CafeHour[]
+  amenities CafeAmenity[]
+  tags      CafeTag[]
+  drinks    Drink[]
+  favorites FavoriteCafe[]
+  reports   Report[]
+  ratings      CafeRating[]
+  userPhotos   CafePhoto[]
+  amenityVotes CafeAmenityVote[]
+
+  @@index([region])
+  @@index([latitude, longitude])
+  @@index([featured, featuredRank])
+}
+
+// Opening hours per weekday (0 = Sunday .. 6 = Saturday). Absence => unknown.
+model CafeHour {
+  id        String  @id @default(cuid())
+  cafeId    String
+  cafe      Cafe    @relation(fields: [cafeId], references: [id], onDelete: Cascade)
+  weekday   Int // 0..6
+  opensMin  Int // minutes from midnight
+  closesMin Int // minutes from midnight (may be > 1440 for past-midnight)
+
+  @@unique([cafeId, weekday, opensMin])
+  @@index([cafeId])
+}
+
+model Amenity {
+  id    String        @id @default(cuid())
+  key   String        @unique // e.g. "wifi", "outlets", "parking", "outdoor"
+  label String
+  cafes CafeAmenity[]
+  votes CafeAmenityVote[]
+}
+
+model CafeAmenity {
+  cafeId    String
+  amenityId String
+  cafe      Cafe    @relation(fields: [cafeId], references: [id], onDelete: Cascade)
+  amenity   Amenity @relation(fields: [amenityId], references: [id], onDelete: Cascade)
+
+  @@id([cafeId, amenityId])
+  @@index([amenityId])
+}
+
+// Purpose/vibe tags used by "Where should I go?" (study, work, date, quiet...).
+model Tag {
+  id    String    @id @default(cuid())
+  key   String    @unique
+  label String
+  cafes CafeTag[]
+}
+
+model CafeTag {
+  cafeId String
+  tagId  String
+  cafe   Cafe @relation(fields: [cafeId], references: [id], onDelete: Cascade)
+  tag    Tag  @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([cafeId, tagId])
+  @@index([tagId])
+}
+
+// ------------------------------------------------------------------
+// Drinks (menu) — only stored where we have reliable info.
+// ------------------------------------------------------------------
+enum DrinkCategory {
+  ESPRESSO
+  COFFEE
+  LATTE
+  COLD_COFFEE
+  MATCHA
+  TEA
+  CHOCOLATE
+  NON_COFFEE
+}
+
+model Drink {
+  id           String        @id @default(cuid())
+  cafeId       String
+  cafe         Cafe          @relation(fields: [cafeId], references: [id], onDelete: Cascade)
+  name         String
+  category     DrinkCategory
+  price        Float?
+  currency     String? // "PHP" | "CHF"
+  hotAvailable Boolean       @default(true)
+  icedAvailable Boolean      @default(false)
+  // Flavor attributes powering "What should I order?" recommendations.
+  sweet     Boolean @default(false)
+  bitter    Boolean @default(false)
+  strong    Boolean @default(false)
+  light     Boolean @default(false)
+  milkBased Boolean @default(false)
+
+  source DataSource @default(CURATED)
+
+  favorites FavoriteDrink[]
+
+  @@index([cafeId])
+  @@index([category])
+}
+
+// ------------------------------------------------------------------
+// DrinkType — GLOBAL reference drinks (general coffee knowledge), NOT a
+// specific cafe's menu or prices. Powers "What should I order?" honestly:
+// we recommend a drink *type* by flavor, without inventing any cafe's menu.
+// See docs/RECOMMENDATIONS.md.
+// ------------------------------------------------------------------
+model DrinkType {
+  id            String        @id @default(cuid())
+  slug          String        @unique
+  name          String
+  category      DrinkCategory
+  description   String        @db.Text
+  hotAvailable  Boolean       @default(true)
+  icedAvailable Boolean       @default(false)
+  // Flavor attributes (general knowledge, e.g. espresso = strong + bitter).
+  sweet     Boolean @default(false)
+  bitter    Boolean @default(false)
+  strong    Boolean @default(false)
+  light     Boolean @default(false)
+  milkBased Boolean @default(false)
+  hasCaffeine Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([category])
+}
+
+// ------------------------------------------------------------------
+// Users & auth (single admin; regular users optional for browsing).
+// ------------------------------------------------------------------
+enum Role {
+  USER
+  ADMIN
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  displayName  String?
+  role         Role     @default(USER)
+  suspended    Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  preference     CoffeePreference?
+  favoriteCafes  FavoriteCafe[]
+  favoriteDrinks FavoriteDrink[]
+  reports        Report[]
+  sessions       Session[]
+  ratings        CafeRating[]
+  photos         CafePhoto[]
+  amenityVotes   CafeAmenityVote[]
+}
+
+// ------------------------------------------------------------------
+// Community (user-generated) content — a distinct, honest data category.
+// Ratings/photos/amenities contributed by signed-in users, clearly labeled as
+// "CupScout community" (never presented as external/Google data).
+// ------------------------------------------------------------------
+model CafeRating {
+  id        String   @id @default(cuid())
+  cafeId    String
+  userId    String
+  value     Int // 1..5
+  cafe      Cafe     @relation(fields: [cafeId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([cafeId, userId]) // one rating per user per cafe
+  @@index([cafeId])
+}
+
+model CafePhoto {
+  id        String   @id @default(cuid())
+  cafeId    String
+  userId    String
+  url       String   @db.Text
+  hidden    Boolean  @default(false) // admin can hide/moderate
+  cafe      Cafe     @relation(fields: [cafeId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@index([cafeId])
+}
+
+model CafeAmenityVote {
+  cafeId    String
+  amenityId String
+  userId    String
+  cafe      Cafe     @relation(fields: [cafeId], references: [id], onDelete: Cascade)
+  amenity   Amenity  @relation(fields: [amenityId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@id([cafeId, amenityId, userId])
+  @@index([cafeId, amenityId])
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}
+
+// Optional explicit coffee profile (no creepy inference).
+model CoffeePreference {
+  userId    String  @id
+  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sweet     Boolean @default(false)
+  bitter    Boolean @default(false)
+  strong    Boolean @default(false)
+  light     Boolean @default(false)
+  milkBased Boolean @default(false)
+  black     Boolean @default(false)
+  iced      Boolean @default(false)
+  hot       Boolean @default(false)
+  matcha    Boolean @default(false)
+  tea       Boolean @default(false)
+  chocolate Boolean @default(false)
+  updatedAt DateTime @updatedAt
+}
+
+model FavoriteCafe {
+  userId    String
+  cafeId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  cafe      Cafe     @relation(fields: [cafeId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@id([userId, cafeId])
+  @@index([cafeId])
+}
+
+model FavoriteDrink {
+  userId    String
+  drinkId   String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  drink     Drink    @relation(fields: [drinkId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@id([userId, drinkId])
+  @@index([drinkId])
+}
+
+// ------------------------------------------------------------------
+// Reports (user-submitted corrections) -> single admin
+// ------------------------------------------------------------------
+enum ReportKind {
+  WRONG_LOCATION
+  WRONG_HOURS
+  CLOSED
+  DUPLICATE
+  WRONG_MENU
+  WRONG_INFO
+  WRONG_PHOTO
+}
+
+enum ReportStatus {
+  OPEN
+  RESOLVED
+  REJECTED
+}
+
+model Report {
+  id        String       @id @default(cuid())
+  cafeId    String
+  cafe      Cafe         @relation(fields: [cafeId], references: [id], onDelete: Cascade)
+  userId    String?
+  user      User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
+  kind      ReportKind
+  details   String?      @db.Text
+  status    ReportStatus @default(OPEN)
+  createdAt DateTime     @default(now())
+  resolvedAt DateTime?
+
+  @@index([cafeId])
+  @@index([status])
+}
+
+// ------------------------------------------------------------------
+// Analytics — lightweight, privacy-conscious event log.
+// ------------------------------------------------------------------
+model AnalyticsEvent {
+  id         String   @id @default(cuid())
+  name       String // "search", "view_cafe", "save_cafe", "recommend_cafe"...
+  properties Json?
+  region     Region?
+  createdAt  DateTime @default(now())
+
+  @@index([name])
+  @@index([createdAt])
+}

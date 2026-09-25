@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="CupScout">
+  <rect width="512" height="512" rx="120" fill="#1c1917"/>
+  <path d="M256 96c-92 0-160 68-160 156 0 112 160 268 160 268s160-156 160-268c0-88-68-156-160-156Z" fill="#a54a16"/>
+  <path d="M176 208h150v58a68 68 0 0 1-68 68h-14a68 68 0 0 1-68-68v-58Z" fill="#fbf3ec"/>
+  <path d="M326 222h20a30 30 0 0 1 0 60h-20" fill="none" stroke="#fbf3ec" stroke-width="26" stroke-linecap="round"/>
+  <path d="M212 150c7 12-7 20 0 34M256 150c7 12-7 20 0 34" fill="none" stroke="#edc3a3" stroke-width="20" stroke-linecap="round"/>
+</svg>

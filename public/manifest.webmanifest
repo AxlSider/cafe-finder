@@ -1,0 +1,18 @@
+{
+  "name": "CupScout",
+  "short_name": "CupScout",
+  "description": "Find your next coffee. Location-first coffee discovery for Luzon and Switzerland.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f9f8f6",
+  "theme_color": "#a54a16",
+  "categories": ["food", "lifestyle", "travel"],
+  "icons": [
+    {
+      "src": "/icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
