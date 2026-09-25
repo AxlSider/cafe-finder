@@ -7,7 +7,9 @@ import type { PlacesProvider } from "./types";
  * See docs/DATA-SOURCES.md and docs/DECISIONS.md.
  */
 export function getPlacesProvider(): PlacesProvider {
-  const provider = process.env.PLACES_PROVIDER ?? "curated";
+  // Default to "curated" when unset OR blank. On some hosts (e.g. Vercel) an
+  // undeclared env var arrives as "" rather than undefined, which `??` misses.
+  const provider = (process.env.PLACES_PROVIDER ?? "").trim() || "curated";
   switch (provider) {
     case "curated":
       return curatedProvider;

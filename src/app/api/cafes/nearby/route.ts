@@ -90,10 +90,7 @@ export async function GET(req: NextRequest) {
   } catch (err) {
     console.error("[/api/cafes/nearby]", err);
     return NextResponse.json(
-      {
-        error: "Could not load cafes right now.",
-        detail: err instanceof Error ? `${err.name}: ${err.message}` : String(err),
-      },
+      { error: "Could not load cafes right now." },
       { status: 500 },
     );
   }
