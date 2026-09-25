@@ -82,13 +82,9 @@ export default async function LandingPage() {
           </dl>
         </div>
 
-        <Link
-          href="/app"
-          aria-label="Open CupScout and find cafes near you"
-          className="group block animate-scale-in rounded-[2.2rem] outline-none transition-transform duration-300 hover:-translate-y-1 focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 focus-visible:ring-offset-surface-muted"
-        >
+        <div className="animate-scale-in">
           <ProductMock cafeCount={cafeCount} />
-        </Link>
+        </div>
       </section>
 
       {/* The two questions */}
@@ -341,9 +337,13 @@ function ProductMock({ cafeCount }: { cafeCount: string }) {
                 </div>
               </div>
             </div>
-            <div className="flex h-9 items-center justify-center gap-1.5 rounded-full bg-brand-600 text-xs font-semibold text-white shadow-sm transition-colors group-hover:bg-brand-700">
+            <Link
+              href="/app"
+              aria-label="Find cafes near you"
+              className="flex h-9 items-center justify-center gap-1.5 rounded-full bg-brand-600 text-xs font-semibold text-white shadow-sm outline-none transition-colors hover:bg-brand-700 focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 focus-visible:ring-offset-surface"
+            >
               <Navigation size={13} /> Get directions
-            </div>
+            </Link>
           </div>
 
           {/* next result peeking below to imply a full list */}
