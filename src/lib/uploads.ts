@@ -2,6 +2,7 @@ import { writeFile, mkdir } from "node:fs/promises";
 import path from "node:path";
 import { randomBytes } from "node:crypto";
 import sharp from "sharp";
+import { put } from "@vercel/blob";
 
 /**
  * Save an uploaded image to public/uploads and return its public URL.
@@ -49,11 +50,27 @@ export async function saveImage(file: unknown): Promise<SaveImageResult> {
   }
 
   const name = `${Date.now()}-${randomBytes(6).toString("hex")}.webp`;
+
+  // Preferred on serverless/Vercel: a persistent object store. When a Blob
+  // token is present we upload there and return its absolute public URL.
+  if (process.env.BLOB_READ_WRITE_TOKEN) {
+    try {
+      const blob = await put(`uploads/${name}`, output, {
+        access: "public",
+        contentType: "image/webp",
+        token: process.env.BLOB_READ_WRITE_TOKEN,
+      });
+      return { ok: true, url: blob.url };
+    } catch (err) {
+      console.error("saveImage: Vercel Blob upload failed", err);
+      return { ok: false, error: "Photo upload failed. Please try again.", status: 502 };
+    }
+  }
+
+  // Fallback: local disk. Works on a persistent host (XAMPP, a VM, a container
+  // with a volume). On a read-only / ephemeral serverless filesystem with no
+  // Blob token this throws — surface an honest error instead of a 500.
   const dir = path.join(process.cwd(), "public", "uploads");
-  // Local disk works on a persistent host (XAMPP, a VM, a container with a
-  // volume). On a read-only / ephemeral serverless filesystem (e.g. Vercel) this
-  // throws — surface an honest error instead of a 500. Production persistence is
-  // an object store (S3/R2/Vercel Blob); see docs/DEPLOYMENT.md.
   try {
     await mkdir(dir, { recursive: true });
     await writeFile(path.join(dir, name), output);
@@ -62,7 +79,7 @@ export async function saveImage(file: unknown): Promise<SaveImageResult> {
     return {
       ok: false,
       error:
-        "Photo uploads aren't available on this deployment yet. Configure object storage to enable them.",
+        "Photo uploads aren't available on this deployment yet. Configure object storage (Vercel Blob) to enable them.",
       status: 503,
     };
   }

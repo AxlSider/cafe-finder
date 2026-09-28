@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { unlink } from "node:fs/promises";
 import path from "node:path";
+import { del } from "@vercel/blob";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/auth/session";
 
@@ -30,9 +31,14 @@ export async function DELETE(
     data: { photoUrl: null, photoAttribution: null },
   });
 
-  // Best-effort remove the local file.
+  // Best-effort remove the underlying file (local disk or Vercel Blob).
   if (photo.url.startsWith("/uploads/")) {
     await unlink(path.join(process.cwd(), "public", photo.url)).catch(() => {});
+  } else if (
+    process.env.BLOB_READ_WRITE_TOKEN &&
+    photo.url.includes(".blob.vercel-storage.com")
+  ) {
+    await del(photo.url, { token: process.env.BLOB_READ_WRITE_TOKEN }).catch(() => {});
   }
   return NextResponse.json({ ok: true });
 }

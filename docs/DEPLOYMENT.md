@@ -33,12 +33,14 @@ give you a database or a persistent filesystem, so two things must be arranged:
 1. **A hosted MySQL** — XAMPP/local MySQL is not reachable from Vercel. Use a
    managed MySQL such as **PlanetScale, Railway, or Aiven** and copy its
    connection string into `DATABASE_URL`.
-2. **Uploads need object storage** — Vercel's filesystem is read-only/ephemeral,
-   so `public/uploads` writes fail. The app handles this gracefully (photo
-   uploads return a clear "not available" message instead of crashing — see
-   `src/lib/uploads.ts`), and everything else works. To actually enable uploads,
-   move them to an object store (Vercel Blob / S3 / R2) behind the `photoUrl`
-   field. Google/Foursquare-enriched photos are unaffected (proxied live).
+2. **Uploads use Vercel Blob** — Vercel's filesystem is read-only/ephemeral, so
+   photo uploads persist in **Vercel Blob** instead. `saveImage`
+   (`src/lib/uploads.ts`) uploads to Blob when `BLOB_READ_WRITE_TOKEN` is set and
+   falls back to local disk otherwise. To enable it: Vercel dashboard →
+   **Storage → Create Database → Blob** → connect it to the project (this
+   auto-adds `BLOB_READ_WRITE_TOKEN`), then redeploy. Until you do, uploads
+   return a clear "not available" message instead of crashing, and everything
+   else works. Google/Foursquare-enriched photos are unaffected (proxied live).
 
 **Steps**
 1. Push this repo to GitHub (already done if you're reading this there).
@@ -52,10 +54,13 @@ give you a database or a persistent filesystem, so two things must be arranged:
    - `GEOCODER_USER_AGENT` — real app name + contact (Nominatim requires it)
    - optional: `FOURSQUARE_API_KEY` / `GOOGLE_MAPS_API_KEY`, tile vars
    - do **not** set `ADMIN_PASSWORD` here unless you also seed; see step 5.
-4. **Run migrations against the hosted DB from your machine** (Vercel has no
-   persistent shell), pointing `DATABASE_URL` at the hosted DB:
+4. **Create the schema + data against the hosted DB from your machine** (Vercel
+   has no persistent shell), pointing `DATABASE_URL` at the hosted DB. Use
+   `db:push` (syncs the full current schema); the `0_init` migration is a baseline
+   and does not yet include later columns, so `migrate deploy` alone is
+   incomplete:
    ```bash
-   DATABASE_URL="mysql://<hosted>" npm run db:deploy   # prisma migrate deploy
+   DATABASE_URL="mysql://<hosted>" npm run db:push      # create/sync all tables
    DATABASE_URL="mysql://<hosted>" npm run db:seed      # curated cafes + drink guide
    # import real OSM cafes as desired, e.g.:
    DATABASE_URL="mysql://<hosted>" npm run db:import baguio

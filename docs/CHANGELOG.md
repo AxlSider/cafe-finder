@@ -49,8 +49,19 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
   ephemeral serverless filesystem — returns an honest 503 "uploads not available"
   instead of a 500. Local/persistent hosts are unchanged.
 - **Deployment:** added a Vercel path to `docs/DEPLOYMENT.md` (hosted MySQL +
-  object-storage caveats, run migrations/seed/admin from local against the hosted
+  object-storage caveats, run schema/seed/admin from local against the hosted
   DB) and a `db:deploy` script (`prisma migrate deploy`).
+- **Vercel deploy hardening (live on TiDB Serverless MySQL):**
+  - **Photo uploads → Vercel Blob:** `saveImage` uploads to Vercel Blob when
+    `BLOB_READ_WRITE_TOKEN` is set (persistent, public URLs), falling back to
+    local disk for XAMPP/VM hosts; admin moderation deletes the Blob too.
+  - **`PLACES_PROVIDER` blank-default fix:** an undeclared env var arrives as `""`
+    (not `undefined`) on Vercel, which slipped past `?? "curated"` and broke
+    `/app` with "Unknown PLACES_PROVIDER". Now defaults to `curated` on blank.
+  - **Region pin:** `vercel.json` pins functions to `sin1` (Singapore) to sit
+    next to the database.
+  - **Setup uses `db:push`** (not `migrate deploy`) since `0_init` is a baseline
+    that predates later columns.
 
 ## [0.8.0] — 2026-09-25 — Sprint 0: security baseline
 ### Added / changed (security)
